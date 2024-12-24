@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tour Selection</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(to bottom right, #6a11cb, #2575fc);
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    p {
+      font-size: 1.2em;
+      margin-bottom: 20px;
+    }
+
+    form {
+      max-width: 500px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      color: #333;
+    }
+
+    label {
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      display: block;
+      font-weight: bold;
+    }
+
+    select {
+      margin: 20px 0;
+      padding: 12px;
+      font-size: 1em;
+      width: 100%;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+      color: #333;
+      outline: none;
+    }
+
+    button {
+      display: none;
+      padding: 12px 20px;
+      font-size: 1em;
+      color: #fff;
+      background-color: #2575fc;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #6a11cb;
+      transform: scale(1.05);
+    }
+
+    footer {
+      margin-top: 20px;
+      font-size: 0.9em;
+      color: #ddd;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Select The Tour Type</h1>
+  <p>Pick a tour, a start time, and an email template!</p>
+  <form id="tourForm">
+    <label for="tourDropdown">Choose a tour:</label>
+    <select id="tourDropdown" name="tour">
+      <option value="" disabled selected>Select Tour Date</option>
+    </select>
+    <div id="additionalSection" style="display: none;">
+      <label for="startTimeDropdown">Available Start Times:</label>
+      <select id="startTimeDropdown">
+        <option value="" disabled selected>Select a start time...</option>
+      </select>
+
+      <label for="emailTemplateDropdown">Choose an Email Template:</label>
+      <select id="emailTemplateDropdown">
+        <option value="" disabled selected>Select an email template...</option>
+        <option value="template1">Template 1</option>
+        <option value="template2">Glenns Dodgy Template</option>
+        <option value="template3">Template 3</option>
+        <option value="template4">Template 4</option>
+      </select>
+
+      <button type="button" id="submitButton" onclick="submitSelection()">Submit</button>
+    </div>
+  </form>
+  <footer>© 2024 Your Travel Company. All rights reserved.</footer>
+  <script src="https://cdn.jsdelivr.net/npm/moment/moment.js"></script>
+
+  <script>
+    async function loadTours() {
+      try {
+        const response = await fetch("https://kimberley-safari-tour-backend.vercel.app/api/tours", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch tours");
+
+        const data = await response.json();
+        const dropdown = document.getElementById("tourDropdown");
+
+        data.data.forEach(item => {
+          const option = document.createElement("option");
+          option.value = item.productId;
+          option.textContent = item.name;
+          dropdown.appendChild(option);
+        });
+
+        dropdown.addEventListener("change", () => {
+          const selectedTour = dropdown.value;
+          if (selectedTour) {
+            fetchBookings(selectedTour);
+          }
+        });
+      } catch (error) {
+        console.error("Error loading tours:", error);
+      }
+    }
+
+    async function fetchBookings(productId) {
+      const url = `https://kimberley-safari-tour-backend.vercel.app/api/bookings?productId=${encodeURIComponent(productId)}`;
+
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const startTimes = data.startTimes || [];
+
+          const startTimeDropdown = document.getElementById("startTimeDropdown");
+          const additionalSection = document.getElementById("additionalSection");
+          const submitButton = document.getElementById("submitButton");
+
+          startTimeDropdown.innerHTML = '<option value="" disabled selected>Select a start time...</option>';
+
+          startTimes.forEach(time => {
+            const option = document.createElement("option");
+            option.value = time;
+            option.textContent = moment(time).format("YYYY-MM-DD HH:mm");
+            startTimeDropdown.appendChild(option);
+          });
+
+          additionalSection.style.display = startTimes.length > 0 ? "block" : "none";
+
+          startTimeDropdown.addEventListener("change", checkSelections);
+          document.getElementById("emailTemplateDropdown").addEventListener("change", checkSelections);
+        } else {
+          console.error("Error fetching bookings:", await response.text());
+        }
+      } catch (error) {
+        console.error("Error fetching bookings:", error.message);
+      }
+    }
+
+    function checkSelections() {
+      const startTimeDropdown = document.getElementById("startTimeDropdown");
+      const emailTemplateDropdown = document.getElementById("emailTemplateDropdown");
+      const submitButton = document.getElementById("submitButton");
+
+      const selectedStartTime = startTimeDropdown.value;
+      const selectedEmailTemplate = emailTemplateDropdown.value;
+
+      submitButton.style.display = selectedStartTime && selectedEmailTemplate ? "inline-block" : "none";
+    }
+
+    async function submitSelection() {
+      const dropdown = document.getElementById("tourDropdown");
+      const startTimeDropdown = document.getElementById("startTimeDropdown");
+      const emailTemplateDropdown = document.getElementById("emailTemplateDropdown");
+
+      const selectedTour = dropdown.value;
+      const selectedStartTime = startTimeDropdown.value;
+      const selectedEmailTemplate = emailTemplateDropdown.value;
+
+      if (!selectedTour || !selectedStartTime || !selectedEmailTemplate) {
+        alert("Please select all options before submitting.");
+        return;
+      }
+
+      // Determine the URL based on the selected email template
+      let apiUrl;
+      switch (selectedEmailTemplate) {
+        case "template1":
+          apiUrl = "https://hooks.zapier.com/hooks/catch/20664855/257tyq4/";
+          break;
+        case "template2":
+          apiUrl = "https://hooks.zapier.com/hooks/catch/20664855/2sls7md/";
+          break;
+        case "template3":
+          apiUrl = "https://hooks.zapier.com/hooks/catch/20664855/template3/";
+          break;
+        case "template4":
+          apiUrl = "https://hooks.zapier.com/hooks/catch/20664855/template4/";
+          break;
+        default:
+          alert("Invalid email template selected.");
+          return;
+      }
+
+      try {
+        const payload = {
+          productID: selectedTour,
+          startTime: selectedStartTime,
+          emailTemplate: selectedEmailTemplate,
+        };
+
+        await fetch(apiUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        alert("Success! Your selection has been submitted.");
+      } catch (error) {
+        console.error("Error submitting selection:", error.message);
+      }
+    }
+
+    window.onload = loadTours;
+  </script>
+</body>
+
+</html>
